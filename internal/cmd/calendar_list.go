@@ -43,6 +43,7 @@ func listCalendarEvents(ctx context.Context, svc *calendar.Service, calendarID, 
 		return outfmt.WriteJSON(os.Stdout, map[string]any{
 			"events":        wrapEventsWithDays(resp.Items),
 			"nextPageToken": resp.NextPageToken,
+			"hasMore":       resp.NextPageToken != "",
 		})
 	}
 
@@ -96,6 +97,7 @@ func listAllCalendarsEvents(ctx context.Context, svc *calendar.Service, from, to
 	}
 
 	all := []*eventWithCalendar{}
+	hasMore := false
 	for _, cal := range calResp.Items {
 		call := svc.Events.List(cal.Id).
 			TimeMin(from).
@@ -121,6 +123,9 @@ func listAllCalendarsEvents(ctx context.Context, svc *calendar.Service, from, to
 			u.Err().Printf("calendar %s: %v", cal.Id, err)
 			continue
 		}
+		if events.NextPageToken != "" {
+			hasMore = true
+		}
 		for _, e := range events.Items {
 			startDay, endDay := eventDaysOfWeek(e)
 			evTimezone := eventTimezone(e)
@@ -139,7 +144,10 @@ func listAllCalendarsEvents(ctx context.Context, svc *calendar.Service, from, to
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(os.Stdout, map[string]any{"events": all})
+		return outfmt.WriteJSON(os.Stdout, map[string]any{
+			"events":  all,
+			"hasMore": hasMore,
+		})
 	}
 	if len(all) == 0 {
 		u.Err().Println("No events")
